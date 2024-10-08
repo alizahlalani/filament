@@ -204,6 +204,54 @@ void PlatformEGLAndroid::setPresentationTime(int64_t presentationTimeInNanosecon
     }
 }
 
+OpenGLPlatform::ExternalTexture* PlatformEGLAndroid::createExternalImageTexture(void* hardware_buffer) noexcept {
+  ExternalTexture* outTexture = new(std::nothrow) ExternalTexture{};
+  AHardwareBuffer* hardwareBuffer = static_cast<AHardwareBuffer*>(hardware_buffer);
+  AHardwareBuffer_Desc hardware_buffer_description = {};
+  AHardwareBuffer_describe(hardwareBuffer, &hardware_buffer_description);
+  // If the texture is in YUV, we will sample it as an external image and let
+  // GL_TEXTURE_EXTERNAL_OES help us convert it into RGB.
+  // we may get YUV pixel format that's undocumented in Android
+  // (e.g. YCbCr_420_SP_VENUS_UBWC from https://jbit.net/Android_Colors/), so we
+  // are currently assuming every non-RGB texture is in YUV. This is not 100%
+  // safe as the pixel format can be neither RGB nor YUV.
+  bool isExternalFormat = true;
+  switch (hardware_buffer_description.format) {
+    case AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM:
+    case AHARDWAREBUFFER_FORMAT_R8G8B8X8_UNORM:
+    case AHARDWAREBUFFER_FORMAT_R8G8B8_UNORM:
+    case AHARDWAREBUFFER_FORMAT_R5G6B5_UNORM:
+    case AHARDWAREBUFFER_FORMAT_R16G16B16A16_FLOAT:
+    case AHARDWAREBUFFER_FORMAT_R10G10B10A2_UNORM:
+    case AHARDWAREBUFFER_FORMAT_D16_UNORM:
+    case AHARDWAREBUFFER_FORMAT_D24_UNORM:
+    case AHARDWAREBUFFER_FORMAT_D24_UNORM_S8_UINT:
+    case AHARDWAREBUFFER_FORMAT_D32_FLOAT:
+    case AHARDWAREBUFFER_FORMAT_D32_FLOAT_S8_UINT:
+    case AHARDWAREBUFFER_FORMAT_S8_UINT:
+      isExternalFormat = false;
+      break;
+  }
+  // Get the EGL client buffer from AHardwareBuffer
+  EGLClientBuffer clientBuffer = eglGetNativeClientBufferANDROID(hardwareBuffer);
+  // Questions around attributes with isSrgbTransfer and protected content
+  EGLint attribs[] = { EGL_NONE };
+  // Create an EGLImage from the client buffer
+  EGLImageKHR eglImage = eglCreateImageKHR(eglGetCurrentDisplay(), EGL_NO_CONTEXT, EGL_NATIVE_BUFFER_ANDROID, clientBuffer, attribs);
+  if (eglImage == EGL_NO_IMAGE_KHR) {
+    // Handle error
+    return nullptr;
+  }
+  // Create and bind the OpenGL texture
+  glGenTextures(1, &outTexture->id);
+  auto target = isExternalFormat ? GL_TEXTURE_EXTERNAL_OES : GL_TEXTURE_2D;
+  glBindTexture(target, outTexture->id);
+  glEGLImageTargetTexture2DOES(target, static_cast<GLeglImageOES>(eglImage));
+  outTexture->target = target;
+  // Create and return ExternalTexture object
+  return outTexture;
+}
+
 Platform::Stream* PlatformEGLAndroid::createStream(void* nativeStream) noexcept {
     return mExternalStreamManager.acquire(static_cast<jobject>(nativeStream));
 }
