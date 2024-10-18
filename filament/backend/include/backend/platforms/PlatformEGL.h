@@ -119,6 +119,7 @@ protected:
     FenceStatus waitFence(Fence* fence, uint64_t timeout) noexcept override;
 
     OpenGLPlatform::ExternalTexture* createExternalImageTexture() noexcept override;
+    OpenGLPlatform::ExternalTexture* createExternalImageTexture(void* hardware_buffer) noexcept override;
     void destroyExternalImage(ExternalTexture* texture) noexcept override;
     bool setExternalImage(void* externalImage, ExternalTexture* texture) noexcept override;
 

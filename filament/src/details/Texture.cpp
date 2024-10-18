@@ -16,6 +16,10 @@
 
 #include "details/Texture.h"
 
+#if defined(__ANDROID__)
+#include <android/hardware_buffer.h>
+#endif //__ANDROID__
+
 #include "details/Engine.h"
 #include "details/Stream.h"
 
@@ -44,6 +48,7 @@
 #include <utils/debug.h>
 #include <utils/FixedCapacityVector.h>
 #include <utils/Panic.h>
+#include <utils/Log.h>
 
 #include <algorithm>
 #include <array>
@@ -226,6 +231,7 @@ Texture* Texture::Builder::build(Engine& engine) {
     FILAMENT_CHECK_PRECONDITION((imported && sampleable) || !imported)
             << "Imported texture must be SAMPLEABLE";
 
+    slog.i << "mExternalBufferTextureCPPBuilder" << io::endl;
     return downcast(engine).createTexture(*this);
 }
 
@@ -252,12 +258,27 @@ FTexture::FTexture(FEngine& engine, const Builder& builder) {
         // we'll lazily create a 1x1 placeholder texture.
         return;
     }
-    if (mExternalBuffer != nullptr) {
-        mHandle = driver.createTextureExternalImage(
-            mFormat, mWidth, mHeight, mUsage, mExternalBuffer);
-    }
+#if defined(__ANDROID__)
+    AHardwareBuffer_Desc desc = {};
+    desc.width = 512; // Set width
+    desc.height = 512; // Set height
+    desc.layers = 1;
+    desc.format = AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM;
+    desc.usage = AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN | AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN;
 
-    if (UTILS_LIKELY(builder->mImportedId == 0)) {
+    AHardwareBuffer* buffer = nullptr;
+    int result = AHardwareBuffer_allocate(&desc, &buffer);
+
+    if (result == 0 && buffer) {
+        mExternalBuffer = buffer; // Mock external buffer assignment
+    }
+#endif //__ANDROID__
+    if (mExternalBuffer != nullptr) {
+      slog.i << "mExternalBufferTextureCPPInstantiate" << io::endl;
+        mHandle = driver.createExternalTexture(
+            mExternalBuffer, mExternalFence);
+    } else if (UTILS_LIKELY(builder->mImportedId == 0)) {
+      slog.i << "mExternalBuffereIfBuilderImported" << io::endl;
         mHandle = driver.createTexture(
                 mTarget, mLevelCount, mFormat, mSampleCount, mWidth, mHeight, mDepth, mUsage);
     } else {
@@ -303,6 +324,7 @@ void FTexture::setImage(FEngine& engine, size_t level,
         uint32_t width, uint32_t height, uint32_t depth,
         FTexture::PixelBufferDescriptor&& p) const {
 
+    slog.i << "mExternalBufferTextureCPPSetImage1" << io::endl;
     if (UTILS_UNLIKELY(!engine.hasFeatureLevel(FeatureLevel::FEATURE_LEVEL_1))) {
         FILAMENT_CHECK_PRECONDITION(p.stride == 0 || p.stride == width)
                 << "PixelBufferDescriptor stride must be 0 (or width) at FEATURE_LEVEL_0";
@@ -392,7 +414,7 @@ void FTexture::setImage(FEngine& engine, size_t level,
 // deprecated
 void FTexture::setImage(FEngine& engine, size_t level,
         Texture::PixelBufferDescriptor&& buffer, const FaceOffsets& faceOffsets) const {
-
+    slog.i << "mExternalBufferTextureCPPSetImage2" << io::endl;
     auto validateTarget = [](SamplerType sampler) -> bool {
         switch (sampler) {
             case SamplerType::SAMPLER_CUBEMAP:
@@ -507,6 +529,7 @@ void FTexture::setExternalStream(FEngine& engine, FStream* stream) noexcept {
     }
 
     auto& api = engine.getDriverApi();
+    slog.i << "mExternalBufferTextureCPPsetExternalStream" << io::endl;
     auto texture = api.createTexture(
             mTarget, mLevelCount, mFormat, mSampleCount, mWidth, mHeight, mDepth, mUsage);
 
@@ -595,6 +618,7 @@ backend::Handle<backend::HwTexture> FTexture::setHandleForSampling(
 
 backend::Handle<backend::HwTexture> FTexture::createPlaceholderTexture(
         backend::DriverApi& driver) noexcept {
+    slog.i << "mExternalBufferTextureCPPCreatePlaceholderTexture" << io::endl;
     auto handle = driver.createTexture(
             Sampler::SAMPLER_2D, 1, InternalFormat::RGBA8, 1, 1, 1, 1, Usage::DEFAULT);
     static uint8_t pixels[4] = { 0, 0, 0, 0 };
@@ -812,6 +836,7 @@ void FTexture::generatePrefilterMipmap(FEngine& engine,
         for (size_t j = 0; j < 6; j++) {
             Image const& faceImage = dst.getImageForFace((Cubemap::Face)j);
             auto offset = uintptr_t(faceImage.getData()) - base;
+            slog.i << "mExternalBufferTextureCPPGenerateMipMap" << io::endl;
             driver.update3DImage(mHandle, level, 0, 0, j, dim, dim, 1, {
                     (char*)image.getData() + offset, dim * dim * 3 * sizeof(float),
                     Texture::PixelBufferDescriptor::PixelDataFormat::RGB,

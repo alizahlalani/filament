@@ -74,8 +74,7 @@ protected:
      * @param presentationTimeInNanosecond
      */
     void setPresentationTime(int64_t presentationTimeInNanosecond) noexcept override;
-
-  OpenGLPlatform::ExternalTexture* createExternalImageTexture(*void hardware_buffer) noexcept override;
+  OpenGLPlatform::ExternalTexture* createExternalImageTexture(void* hardware_buffer) noexcept override;
   Stream* createStream(void* nativeStream) noexcept override;
     void destroyStream(Stream* stream) noexcept override;
     void attach(Stream* stream, intptr_t tname) noexcept override;

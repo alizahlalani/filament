@@ -51,6 +51,7 @@
 #include <utils/compiler.h>
 #include <utils/debug.h>
 #include <utils/ostream.h>
+#include <utils/Log.h>
 
 #include <math/vec2.h>
 #include <math/vec3.h>
@@ -831,13 +832,38 @@ void OpenGLDriver::textureStorage(OpenGLDriver::GLTexture* t,
 }
 
 void OpenGLDriver::createExternalTextureR(Handle<HwTexture> th, void* buffer, void* fence) {
+  slog.i << "mExternalBufferOpenGLCreateExternalTextureR" << io::endl;
+  GLTexture* texture = handle_cast<GLTexture*>(th);
+  if (texture != nullptr && buffer != nullptr) {
+    slog.i << "mExternalBufferTextureOpenGLCreateExternalTextureRTextureExists" << io::endl;
+    // Create the external texture using the buffer, this interacts with PlatformEGLAndroid
+    OpenGLPlatform::ExternalTexture* externalTexture = mPlatform.createExternalImageTexture(buffer);
 
+    if (externalTexture) {
+      // Assign the external texture to the GLTexture object
+      texture->gl.id = externalTexture->id;
+      texture->gl.target = externalTexture->target;
+
+      // Optionally handle the fence if provided
+      if (fence != nullptr) {
+        // Synchronize with the fence if necessary (depends on how you manage the fence)
+        // This might involve waiting for the fence to signal completion before proceeding
+        glWaitSync((GLsync)fence, 0, GL_TIMEOUT_IGNORED);
+      }
+    } else {
+      // Handle failure in creating external texture
+      slog.e << "Failed to create external texture." << io::endl;
+    }
+  } else {
+    slog.e << "Invalid texture handle or buffer." << io::endl;
+  }
+  CHECK_GL_ERROR(utils::slog.e)
 }
 void OpenGLDriver::createTextureR(Handle<HwTexture> th, SamplerType target, uint8_t levels,
         TextureFormat format, uint8_t samples, uint32_t w, uint32_t h, uint32_t depth,
         TextureUsage usage) {
     DEBUG_MARKER()
-
+    slog.i << "mExternalBufferOpenGLCreateTextureR" << io::endl;
     GLenum internalFormat = getInternalFormat(format);
     assert_invariant(internalFormat);
 
@@ -1040,14 +1066,16 @@ void OpenGLDriver::createTextureViewSwizzleR(Handle<HwTexture> th, Handle<HwText
 
 void OpenGLDriver::createTextureExternalImageR(Handle<HwTexture> th, backend::TextureFormat format,
         uint32_t width, uint32_t height, backend::TextureUsage usage, void* image) {
-    createTextureR(th, SamplerType::SAMPLER_EXTERNAL, 1, format, 1, width, height, 1, usage);
+  slog.i << "mExternalBufferOpenGLcreateTextureExternalImageR" << io::endl;
+  createTextureR(th, SamplerType::SAMPLER_EXTERNAL, 1, format, 1, width, height, 1, usage);
     setExternalImage(th, image);
 }
 
 void OpenGLDriver::createTextureExternalImagePlaneR(Handle<HwTexture> th,
         backend::TextureFormat format, uint32_t width, uint32_t height, backend::TextureUsage usage,
         void* image, uint32_t plane) {
-    createTextureR(th, SamplerType::SAMPLER_EXTERNAL, 1, format, 1, width, height, 1, usage);
+  slog.i << "mExternalBufferOpenGLcreateTextureExternalImagePlaneR" << io::endl;
+  createTextureR(th, SamplerType::SAMPLER_EXTERNAL, 1, format, 1, width, height, 1, usage);
     setExternalImagePlane(th, image, plane);
 }
 
@@ -2532,6 +2560,7 @@ void OpenGLDriver::update3DImage(Handle<HwTexture> th,
         uint32_t width, uint32_t height, uint32_t depth,
         PixelBufferDescriptor&& data) {
     DEBUG_MARKER()
+    slog.i << "mExternalBufferOpenGLUpdate3DImage" << io::endl;
 
     GLTexture* t = handle_cast<GLTexture *>(th);
     if (data.type == PixelDataType::COMPRESSED) {
@@ -2604,6 +2633,7 @@ void OpenGLDriver::setTextureData(GLTexture* t, uint32_t level,
     void const* const buffer = static_cast<char const*>(p.buffer)
             + bpp* p.left + bpr * p.top + bpl * 0; // TODO: PBD should have a p.depth
 
+    slog.i << "mExternalBufferSAMPLER_EXTERNAL " << t->target << io::endl;
     switch (t->target) {
         case SamplerType::SAMPLER_EXTERNAL:
             // if we get there, it's because the user is trying to use an external texture,

@@ -25,6 +25,7 @@
 #include <utils/compiler.h>
 
 #include <utils/Invocable.h>
+#include <utils/Log.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -118,7 +119,12 @@ void OpenGLPlatform::updateTexImage(
 
 
 OpenGLPlatform::ExternalTexture* OpenGLPlatform::createExternalImageTexture() noexcept {
-    return nullptr;
+//  slog.i << "mExternalBufferOpenGLPlatform" << io::endl;
+  return nullptr;
+}
+
+OpenGLPlatform::ExternalTexture* OpenGLPlatform::createExternalImageTexture(void* hardware_buffer) noexcept {
+  return nullptr;
 }
 
 void OpenGLPlatform::destroyExternalImage(

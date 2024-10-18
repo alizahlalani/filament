@@ -204,7 +204,8 @@ void PlatformEGLAndroid::setPresentationTime(int64_t presentationTimeInNanosecon
     }
 }
 
-OpenGLPlatform::ExternalTexture* PlatformEGLAndroid::createExternalImageTexture(void* hardware_buffer) noexcept {
+OpenGLPlatform::ExternalTexture* UTILS_NULLABLE PlatformEGLAndroid::createExternalImageTexture(void* _Nullable hardware_buffer) noexcept {
+  slog.i << "mExternalBufferPlatformEGLAndroid" << io::endl;
   ExternalTexture* outTexture = new(std::nothrow) ExternalTexture{};
   AHardwareBuffer* hardwareBuffer = static_cast<AHardwareBuffer*>(hardware_buffer);
   AHardwareBuffer_Desc hardware_buffer_description = {};
@@ -235,9 +236,26 @@ OpenGLPlatform::ExternalTexture* PlatformEGLAndroid::createExternalImageTexture(
   // Get the EGL client buffer from AHardwareBuffer
   EGLClientBuffer clientBuffer = eglGetNativeClientBufferANDROID(hardwareBuffer);
   // Questions around attributes with isSrgbTransfer and protected content
-  EGLint attribs[] = { EGL_NONE };
+  EGLint imageAttrs[] = {EGL_IMAGE_PRESERVED_KHR,
+                      EGL_TRUE,
+                      EGL_NONE,
+                      EGL_NONE,
+                      EGL_NONE,
+                      EGL_NONE,
+                      EGL_NONE};
+  int attrIndex = 2;
+  bool isSrgbTransfer = true;
+  if (isSrgbTransfer) {
+    imageAttrs[attrIndex++] = EGL_GL_COLORSPACE;
+    imageAttrs[attrIndex++] = EGL_GL_COLORSPACE_SRGB;
+  }
+
+  if (hardware_buffer_description.usage & AHARDWAREBUFFER_USAGE_PROTECTED_CONTENT) {
+    imageAttrs[attrIndex++] = EGL_PROTECTED_CONTENT_EXT;
+    imageAttrs[attrIndex++] = EGL_TRUE;
+  }
   // Create an EGLImage from the client buffer
-  EGLImageKHR eglImage = eglCreateImageKHR(eglGetCurrentDisplay(), EGL_NO_CONTEXT, EGL_NATIVE_BUFFER_ANDROID, clientBuffer, attribs);
+  EGLImageKHR eglImage = eglCreateImageKHR(eglGetCurrentDisplay(), EGL_NO_CONTEXT, EGL_NATIVE_BUFFER_ANDROID, clientBuffer, imageAttrs);
   if (eglImage == EGL_NO_IMAGE_KHR) {
     // Handle error
     return nullptr;
@@ -248,6 +266,7 @@ OpenGLPlatform::ExternalTexture* PlatformEGLAndroid::createExternalImageTexture(
   glBindTexture(target, outTexture->id);
   glEGLImageTargetTexture2DOES(target, static_cast<GLeglImageOES>(eglImage));
   outTexture->target = target;
+
   // Create and return ExternalTexture object
   return outTexture;
 }

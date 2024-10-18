@@ -320,6 +320,8 @@ public:
      */
     virtual ExternalTexture* UTILS_NULLABLE createExternalImageTexture() noexcept;
 
+    virtual ExternalTexture* UTILS_NULLABLE createExternalImageTexture(void* _Nullable hardware_buffer) noexcept;
+
     /**
      * Destroys an external texture handle and associated data.
      * @param texture a pointer to the handle to destroy.
