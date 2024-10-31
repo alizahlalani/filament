@@ -16,6 +16,7 @@
 
 package com.google.android.filament;
 
+import android.hardware.HardwareBuffer;
 import androidx.annotation.IntRange;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -673,6 +674,8 @@ public class Texture {
         private final BuilderFinalizer mFinalizer;
         private final long mNativeBuilder;
 
+        private Object mExternalBuffer;
+
         /**
          * Use <code>Builder</code> to construct a <code>Texture</code> object instance.
          */
@@ -751,6 +754,12 @@ public class Texture {
         @NonNull
         public Builder format(@NonNull InternalFormat format) {
             nBuilderFormat(mNativeBuilder, format.ordinal());
+            return this;
+        }
+
+        @Nullable
+        public Builder buffer(@Nullable HardwareBuffer buffer) {
+            nBuilderBuffer(mNativeBuilder, buffer);
             return this;
         }
 
@@ -1258,6 +1267,7 @@ public class Texture {
     private static native void nBuilderLevels(long nativeBuilder, int levels);
     private static native void nBuilderSampler(long nativeBuilder, int sampler);
     private static native void nBuilderFormat(long nativeBuilder, int format);
+    private static native void nBuilderBuffer(long nativeBuilder, HardwareBuffer buffer);
     private static native void nBuilderUsage(long nativeBuilder, int flags);
     private static native void nBuilderSwizzle(long nativeBuilder, int r, int g, int b, int a);
     private static native void nBuilderImportTexture(long nativeBuilder, long id);

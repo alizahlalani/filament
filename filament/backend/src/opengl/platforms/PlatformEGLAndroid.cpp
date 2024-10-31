@@ -207,6 +207,10 @@ void PlatformEGLAndroid::setPresentationTime(int64_t presentationTimeInNanosecon
 OpenGLPlatform::ExternalTexture* UTILS_NULLABLE PlatformEGLAndroid::createExternalImageTexture(void* _Nullable hardware_buffer) noexcept {
   slog.i << "mExternalBufferPlatformEGLAndroid" << io::endl;
   ExternalTexture* outTexture = new(std::nothrow) ExternalTexture{};
+  if (!outTexture) {
+    slog.e << "mExternalBufferPlatformEGLAndroid Failed to allocate ExternalTexture" << io::endl;
+    return nullptr;
+  }
   AHardwareBuffer* hardwareBuffer = static_cast<AHardwareBuffer*>(hardware_buffer);
   AHardwareBuffer_Desc hardware_buffer_description = {};
   AHardwareBuffer_describe(hardwareBuffer, &hardware_buffer_description);
@@ -216,6 +220,7 @@ OpenGLPlatform::ExternalTexture* UTILS_NULLABLE PlatformEGLAndroid::createExtern
   // (e.g. YCbCr_420_SP_VENUS_UBWC from https://jbit.net/Android_Colors/), so we
   // are currently assuming every non-RGB texture is in YUV. This is not 100%
   // safe as the pixel format can be neither RGB nor YUV.
+  slog.i << "mExternalBufferPlatformEGLAndroid hb format " << hardware_buffer_description.format << io::endl;
   bool isExternalFormat = true;
   switch (hardware_buffer_description.format) {
     case AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM:
@@ -233,6 +238,8 @@ OpenGLPlatform::ExternalTexture* UTILS_NULLABLE PlatformEGLAndroid::createExtern
       isExternalFormat = false;
       break;
   }
+  // Log the determined target type
+  slog.i << "mExternalBufferPlatformEGLAndroid Texture target is " << (isExternalFormat ? "GL_TEXTURE_EXTERNAL_OES" : "GL_TEXTURE_2D") << io::endl;
   // Get the EGL client buffer from AHardwareBuffer
   EGLClientBuffer clientBuffer = eglGetNativeClientBufferANDROID(hardwareBuffer);
   // Questions around attributes with isSrgbTransfer and protected content
@@ -244,28 +251,55 @@ OpenGLPlatform::ExternalTexture* UTILS_NULLABLE PlatformEGLAndroid::createExtern
                       EGL_NONE,
                       EGL_NONE};
   int attrIndex = 2;
-  bool isSrgbTransfer = true;
+  bool isSrgbTransfer = false;
   if (isSrgbTransfer) {
     imageAttrs[attrIndex++] = EGL_GL_COLORSPACE;
     imageAttrs[attrIndex++] = EGL_GL_COLORSPACE_SRGB;
   }
 
-  if (hardware_buffer_description.usage & AHARDWAREBUFFER_USAGE_PROTECTED_CONTENT) {
-    imageAttrs[attrIndex++] = EGL_PROTECTED_CONTENT_EXT;
-    imageAttrs[attrIndex++] = EGL_TRUE;
-  }
+//  if (hardware_buffer_description.usage & AHARDWAREBUFFER_USAGE_PROTECTED_CONTENT) {
+//    imageAttrs[attrIndex++] = EGL_PROTECTED_CONTENT_EXT;
+//    imageAttrs[attrIndex++] = EGL_TRUE;
+//  }
   // Create an EGLImage from the client buffer
   EGLImageKHR eglImage = eglCreateImageKHR(eglGetCurrentDisplay(), EGL_NO_CONTEXT, EGL_NATIVE_BUFFER_ANDROID, clientBuffer, imageAttrs);
   if (eglImage == EGL_NO_IMAGE_KHR) {
     // Handle error
+    slog.e << "mExternalBufferPlatformEGLAndroid Failed to create EGL image" << io::endl;
+    delete outTexture;
     return nullptr;
   }
   // Create and bind the OpenGL texture
   glGenTextures(1, &outTexture->id);
+  glActiveTexture(GL_TEXTURE0);
   auto target = isExternalFormat ? GL_TEXTURE_EXTERNAL_OES : GL_TEXTURE_2D;
   glBindTexture(target, outTexture->id);
+  GLenum error = glGetError();
+  if (error != GL_NO_ERROR) {
+    slog.e << "mExternalBufferPlatformEGLAndroid Error after glBindTexture: " << error << io::endl;
+    glDeleteTextures(1, &outTexture->id);
+    eglDestroyImageKHR(eglGetCurrentDisplay(), eglImage);
+    delete outTexture;
+    return nullptr;
+  }
   glEGLImageTargetTexture2DOES(target, static_cast<GLeglImageOES>(eglImage));
+  error = glGetError();
+  if (error != GL_NO_ERROR) {
+    slog.e << "mExternalBufferPlatformEGLAndroid Error after glEGLImageTargetTexture2DOES: " << error << io::endl;
+  }
+
+  if (!isExternalFormat) {
+    // Set up mipmap generation for GL_TEXTURE_2D only
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    error = glGetError();
+    if (error != GL_NO_ERROR) {
+      slog.e << "mExternalBufferPlatformEGLAndroid Error after mipmap generation: " << error << io::endl;
+    }
+  }
   outTexture->target = target;
+  slog.i << "mExternalBufferPlatformEGLAndroid Successfully created external image texture with ID: " << outTexture->id << io::endl;
 
   // Create and return ExternalTexture object
   return outTexture;

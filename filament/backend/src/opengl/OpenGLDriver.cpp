@@ -843,6 +843,10 @@ void OpenGLDriver::createExternalTextureR(Handle<HwTexture> th, void* buffer, vo
       // Assign the external texture to the GLTexture object
       texture->gl.id = externalTexture->id;
       texture->gl.target = externalTexture->target;
+      // Use hardcoded dimensions for now
+      texture->width = 1024;  // Hardcoded width
+      texture->height = 1024; // Hardcoded height
+      texture->usage |= TextureUsage::SAMPLEABLE;
 
       // Optionally handle the fence if provided
       if (fence != nullptr) {
@@ -894,6 +898,7 @@ void OpenGLDriver::createTextureR(Handle<HwTexture> th, SamplerType target, uint
         }
 
         if (UTILS_UNLIKELY(t->target == SamplerType::SAMPLER_EXTERNAL)) {
+            // follow this logic for createExternalTexture
             t->externalTexture = mPlatform.createExternalImageTexture();
             if (t->externalTexture) {
                 t->gl.target = t->externalTexture->target;
@@ -1064,6 +1069,7 @@ void OpenGLDriver::createTextureViewSwizzleR(Handle<HwTexture> th, Handle<HwText
     CHECK_GL_ERROR(utils::slog.e)
 }
 
+// this is what we want
 void OpenGLDriver::createTextureExternalImageR(Handle<HwTexture> th, backend::TextureFormat format,
         uint32_t width, uint32_t height, backend::TextureUsage usage, void* image) {
   slog.i << "mExternalBufferOpenGLcreateTextureExternalImageR" << io::endl;
@@ -2585,6 +2591,7 @@ void OpenGLDriver::generateMipmaps(Handle<HwTexture> th) {
     bindTexture(OpenGLContext::DUMMY_TEXTURE_BINDING, t);
     gl.activeTexture(OpenGLContext::DUMMY_TEXTURE_BINDING);
 
+    slog.i << "Debugging Internal format for mipmap generation: " << t->gl.internalFormat << io::endl;
     glGenerateMipmap(t->gl.target);
 
     CHECK_GL_ERROR(utils::slog.e)
@@ -2595,6 +2602,18 @@ void OpenGLDriver::setTextureData(GLTexture* t, uint32_t level,
         uint32_t width, uint32_t height, uint32_t depth,
         PixelBufferDescriptor&& p) {
     auto& gl = mContext;
+//    t->width = 1024;
+//    t->height = 1024;
+    slog.i << "mExternalBufferLogSAMPLER_TYPE-GL_TARGET" << t->gl.target << io::endl;
+    slog.i << "mExternalBufferLogSAMPLER_TYPE " << t->target << io::endl;
+    slog.i << "mExternalBufferLogLevel " << level << io::endl;
+    slog.i << "mExternalBufferLogxoffset " << xoffset << io::endl;
+    slog.i << "mExternalBufferLogyoffset " << yoffset << io::endl;
+    slog.i << "mExternalBufferLogzoffset " << zoffset << io::endl;
+    slog.i << "mExternalBufferLogwidth " << width << io::endl;
+    slog.i << "mExternalBufferLogheight " << height << io::endl;
+    slog.i << "mExternalBufferLogTwidth " << t->width << io::endl;
+    slog.i << "mExternalBufferLogTheight " << t->height << io::endl;
 
     assert_invariant(t != nullptr);
     assert_invariant(xoffset + width <= std::max(1u, t->width >> level));
@@ -2603,6 +2622,7 @@ void OpenGLDriver::setTextureData(GLTexture* t, uint32_t level,
 
     if (UTILS_UNLIKELY(t->gl.target == GL_TEXTURE_EXTERNAL_OES)) {
         // this is in fact an external texture, this becomes a no-op.
+        slog.i << "mExternalBufferLogEntered " << t->height << io::endl;
         return;
     }
 
@@ -2632,9 +2652,8 @@ void OpenGLDriver::setTextureData(GLTexture* t, uint32_t level,
     size_t const bpl = bpr * height; // TODO: PBD should have a "layer stride"
     void const* const buffer = static_cast<char const*>(p.buffer)
             + bpp* p.left + bpr * p.top + bpl * 0; // TODO: PBD should have a p.depth
-
-    slog.i << "mExternalBufferSAMPLER_EXTERNAL " << t->target << io::endl;
-    switch (t->target) {
+  GLenum error;
+  switch (t->target) {
         case SamplerType::SAMPLER_EXTERNAL:
             // if we get there, it's because the user is trying to use an external texture,
             // but it's not supported, so instead, we behave like a texture2d.
@@ -2643,10 +2662,18 @@ void OpenGLDriver::setTextureData(GLTexture* t, uint32_t level,
             // NOTE: GL_TEXTURE_2D_MULTISAMPLE is not allowed
             bindTexture(OpenGLContext::DUMMY_TEXTURE_BINDING, t);
             gl.activeTexture(OpenGLContext::DUMMY_TEXTURE_BINDING);
+            error = glGetError();
+            if (error != GL_NO_ERROR) {
+                slog.e << "mExternalBufferLog Error after binding texture: " << error << io::endl;
+            }
             assert_invariant(t->gl.target == GL_TEXTURE_2D);
             glTexSubImage2D(t->gl.target, GLint(level),
                     GLint(xoffset), GLint(yoffset),
                     GLsizei(width), GLsizei(height), glFormat, glType, buffer);
+            glGetError();
+            if (error != GL_NO_ERROR) {
+              slog.e << "mExternalBufferLog Error after glTexSubImage2D in SAMPLER_2D: " << error << io::endl;
+            }
             break;
         case SamplerType::SAMPLER_3D:
             assert_invariant(!gl.isES2());

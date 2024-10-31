@@ -21,6 +21,7 @@
 
 #ifdef __ANDROID__
 #include <android/bitmap.h>
+#include <android/hardware_buffer_jni.h>
 #endif
 
 #include <backend/BufferDescriptor.h>
@@ -114,6 +115,14 @@ Java_com_google_android_filament_Texture_nBuilderFormat(JNIEnv*, jclass,
         jlong nativeBuilder, jint format) {
     Texture::Builder *builder = (Texture::Builder *) nativeBuilder;
     builder->format((Texture::InternalFormat) format);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_google_android_filament_Texture_nBuilderBuffer(JNIEnv* env, jclass,
+                                                        jlong nativeBuilder, jobject buffer) {
+  Texture::Builder *builder = (Texture::Builder *) nativeBuilder;
+  AHardwareBuffer* nativeBuffer = AHardwareBuffer_fromHardwareBuffer(env, buffer);
+  builder->external(nativeBuffer, nullptr);
 }
 
 extern "C" JNIEXPORT void JNICALL

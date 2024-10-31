@@ -57,5 +57,7 @@ dependencies {
     implementation deps.kotlin
     implementation project(':filament-android')
     implementation project(':gltfio-android')
-    implementation project(':filament-utils-android') // required for KTXLoader
+    implementation project(':filament-utils-android')
+    implementation 'androidx.annotation:annotation-jvm:1.9.0'
+// required for KTXLoader
 }

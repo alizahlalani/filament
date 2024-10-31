@@ -38,7 +38,8 @@ fun loadTexture(engine: Engine, resources: Resources, resourceId: Int, type: Tex
     // Color is the only type of texture we want to pre-multiply with the alpha channel
     // Pre-multiplication is the default behavior, so we need to turn it off here
     options.inPremultiplied = type == TextureType.COLOR
-
+    // print out TextureType - match it other print out, with a counter
+    println("alizah textureType: $type")
     val bitmap = BitmapFactory.decodeResource(resources, resourceId, options)
 
     val texture = Texture.Builder()

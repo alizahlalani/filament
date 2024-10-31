@@ -144,7 +144,8 @@ Texture::Builder& Texture::Builder::import(intptr_t id) noexcept {
 
 Texture::Builder& Texture::Builder::external(void* UTILS_NULLABLE buffer, void* UTILS_NULLABLE fence) noexcept {
     assert_invariant(buffer);
-    assert_invariant(fence);
+//    assert_invariant(fence);
+    slog.i << "mExternalBufferTextureHITExtern" << io::endl;
     mImpl->mExternalBuffer = buffer;
     mImpl->mExternalFence = fence;
     return *this;
@@ -256,31 +257,54 @@ FTexture::FTexture(FEngine& engine, const Builder& builder) {
         // mHandle and mHandleForSampling will be created in setExternalImage()
         // If this Texture is used for sampling before setExternalImage() is called,
         // we'll lazily create a 1x1 placeholder texture.
-        return;
+        return; // why are we returning?
     }
+  // invoke FE::setExternalTexture here / if buffer exists - pass buffer in for void* image
 #if defined(__ANDROID__)
+    // check if its the texture we want and intercept it
+    // we need to force SAMPLER_EXTERNAL from this point on for that one image
     AHardwareBuffer_Desc desc = {};
-    desc.width = 512; // Set width
-    desc.height = 512; // Set height
+    desc.width = 1024; // Set width
+    desc.height = 1024; // Set height
     desc.layers = 1;
     desc.format = AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM;
-    desc.usage = AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN | AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN;
+    desc.usage = AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE |
+             AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT |
+             AHARDWAREBUFFER_USAGE_GPU_FRAMEBUFFER;
 
     AHardwareBuffer* buffer = nullptr;
     int result = AHardwareBuffer_allocate(&desc, &buffer);
 
     if (result == 0 && buffer) {
-        mExternalBuffer = buffer; // Mock external buffer assignment
+        mExternalBuffer = static_cast<AHardwareBuffer*>(buffer); // Mock external buffer assignment
+    } else {
+      slog.e << "mExternalBufferTexture Failed to allocate AHardwareBuffer, error code: " << result << io::endl;
     }
 #endif //__ANDROID__
+//    mExternalBuffer = nullptr;
+// print width height and format here to see the images - intercept one image
+// if isWoodTexture
+// { createAHardwareBufferFromWoodTexture } - copy data logged above
+// likely looking for RGBA8
+// look for floor_basecolor
+    slog.i << "alizah width: " << mWidth << io::endl;
+    slog.i << "alizah height: " << mHeight << io::endl;
+    slog.i << "alizah format: " << mFormat << io::endl;
+    slog.i << "alizah level: " << mLevelCount << io::endl;
+    slog.i << "alizah usage: " << static_cast<int>(mUsage) << io::endl;
     if (mExternalBuffer != nullptr) {
       slog.i << "mExternalBufferTextureCPPInstantiate" << io::endl;
         mHandle = driver.createExternalTexture(
             mExternalBuffer, mExternalFence);
     } else if (UTILS_LIKELY(builder->mImportedId == 0)) {
+      // Create texture with external sampler instead
       slog.i << "mExternalBuffereIfBuilderImported" << io::endl;
         mHandle = driver.createTexture(
                 mTarget, mLevelCount, mFormat, mSampleCount, mWidth, mHeight, mDepth, mUsage);
+        //if buffer exists => {
+        // driver.setExternalImage
+        // return;
+        // }
     } else {
         mHandle = driver.importTexture(builder->mImportedId,
                 mTarget, mLevelCount, mFormat, mSampleCount, mWidth, mHeight, mDepth, mUsage);
@@ -480,6 +504,7 @@ void FTexture::setImage(FEngine& engine, size_t level,
     const_cast<FTexture*>(this)->updateLodRange(level);
 }
 
+// this is where we look
 void FTexture::setExternalImage(FEngine& engine, void* image) noexcept {
     if (mTarget != Sampler::SAMPLER_EXTERNAL) {
         return;

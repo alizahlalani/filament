@@ -1,0 +1,21 @@
+material {
+    name : "TexturedObject",
+    shadingModel : unlit,
+    parameters : [
+        {
+            type : samplerExternal,
+            name : baseColor
+        }
+    ],
+    requires : [
+        "uv0"  // This tells the material to expect UV coordinates
+    ]
+}
+
+fragment {
+    void material(inout MaterialInputs material) {
+        prepareMaterial(material);
+        vec2 uv = getUV0();  // Use getUV0() to retrieve UV coordinates
+        material.baseColor = texture(materialParams_baseColor, uv);
+    }
+}
