@@ -168,6 +168,7 @@ private:
     bool mTextureIsSwizzled;
 
     Usage mUsage = Usage::DEFAULT;
+    void* mExternalBuffer = nullptr;
 
     // TODO: remove in a future filament release.
     // Indicates whether the user has set the TextureUsage::BLIT_SRC usage. This will be used to

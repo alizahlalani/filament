@@ -57,6 +57,8 @@ protected:
     Driver* createDriver(void* sharedContext,
             const Platform::DriverConfig& driverConfig) noexcept override;
 
+    bool setExternalImage(void* hardware_buffer, ExternalTexture* texture) noexcept override;
+
     // --------------------------------------------------------------------------------------------
     // OpenGLPlatform Interface
 

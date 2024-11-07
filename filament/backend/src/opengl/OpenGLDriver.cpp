@@ -2560,18 +2560,45 @@ void OpenGLDriver::setTextureData(GLTexture* t, uint32_t level,
         PixelBufferDescriptor&& p) {
     auto& gl = mContext;
 
+    // Log the texture target before the check
+    slog.i << "Setting texture data for target: " << t->gl.target << ", level: " << level
+           << ", dimensions: " << width << "x" << height << io::endl;
+
+    if (UTILS_UNLIKELY(t->gl.target == GL_TEXTURE_EXTERNAL_OES)) {
+      // this is in fact an external texture, this becomes a no-op.
+      slog.i << "Skipping texture update for external texture." << io::endl;
+      return;
+    }
+
+//    if(xoffset + width <= std::max(1u, t->width >> level)){
+      slog.e << "Texture update out of bounds: xoffset = " << xoffset
+             << ", width = " << width
+             << ", texture width at level: " << "twidth " << t->width << "level " << level << " " << (t->width >> level) << io::endl;
+//    }
+    if(yoffset + height <= std::max(1u, t->height >> level)){
+      slog.e << "Texture update out of bounds: yoffset = " << yoffset
+             << ", height = " << height
+             << ", texture height at level: " << (t->height >> level) << io::endl;
+    }
+
     assert_invariant(t != nullptr);
     assert_invariant(xoffset + width <= std::max(1u, t->width >> level));
     assert_invariant(yoffset + height <= std::max(1u, t->height >> level));
     assert_invariant(t->samples <= 1);
 
-    if (UTILS_UNLIKELY(t->gl.target == GL_TEXTURE_EXTERNAL_OES)) {
-        // this is in fact an external texture, this becomes a no-op.
-        return;
-    }
+    // Log texture state before operations
+    slog.i << "Setting texture data for target: " << t->gl.target << ", level: " << level
+           << ", dimensions: " << width << "x" << height << io::endl;
 
     GLenum glFormat;
     GLenum glType;
+
+    // Perform OpenGL operations here
+    GLenum error = glGetError(); // Capture any errors before operations
+    if (error != GL_NO_ERROR) {
+      slog.e << "OpenGL error before setting texture data: " << error << io::endl;
+    }
+
     if (mContext.isES2()) {
         auto formatAndType = textureFormatToFormatAndType(t->format);
         glFormat = formatAndType.first;
@@ -2603,6 +2630,7 @@ void OpenGLDriver::setTextureData(GLTexture* t, uint32_t level,
             // but it's not supported, so instead, we behave like a texture2d.
             // fallthrough...
         case SamplerType::SAMPLER_2D:
+            slog.e << "OpenGL hit fallthrough " << error << io::endl;
             // NOTE: GL_TEXTURE_2D_MULTISAMPLE is not allowed
             bindTexture(OpenGLContext::DUMMY_TEXTURE_BINDING, t);
             gl.activeTexture(OpenGLContext::DUMMY_TEXTURE_BINDING);
@@ -2610,6 +2638,11 @@ void OpenGLDriver::setTextureData(GLTexture* t, uint32_t level,
             glTexSubImage2D(t->gl.target, GLint(level),
                     GLint(xoffset), GLint(yoffset),
                     GLsizei(width), GLsizei(height), glFormat, glType, buffer);
+            // delete later
+            error = glGetError(); // Capture any errors before operations
+            if (error != GL_NO_ERROR) {
+              slog.e << "OpenGL error in fallthrough: " << error << io::endl;
+            }
             break;
         case SamplerType::SAMPLER_3D:
             assert_invariant(!gl.isES2());
@@ -2754,6 +2787,7 @@ void OpenGLDriver::setupExternalImage(void* image) {
 }
 
 void OpenGLDriver::setExternalImage(Handle<HwTexture> th, void* image) {
+    slog.i << "mExternalBufferOpenGLDriver" << io::endl;
     DEBUG_MARKER()
     GLTexture* t = handle_cast<GLTexture*>(th);
     assert_invariant(t);

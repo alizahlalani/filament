@@ -16,6 +16,10 @@
 
 #include "details/Texture.h"
 
+#if defined(__ANDROID__)
+#include <android/hardware_buffer.h>
+#endif //__ANDROID__
+
 #include "details/Engine.h"
 #include "details/Stream.h"
 
@@ -44,6 +48,7 @@
 #include <utils/debug.h>
 #include <utils/FixedCapacityVector.h>
 #include <utils/Panic.h>
+#include <utils/Log.h>
 
 #include <algorithm>
 #include <array>
@@ -243,6 +248,7 @@ FTexture::FTexture(FEngine& engine, const Builder& builder) {
     mSwizzle = builder->mSwizzle;
     mTextureIsSwizzled = builder->mTextureIsSwizzled;
     mHasBlitSrc = builder->mHasBlitSrc;
+    mExternalBuffer = nullptr;
 
     bool const isImported = builder->mImportedId != 0;
     if (mTarget == SamplerType::SAMPLER_EXTERNAL && !isImported) {
@@ -251,13 +257,44 @@ FTexture::FTexture(FEngine& engine, const Builder& builder) {
         // we'll lazily create a 1x1 placeholder texture.
         return;
     }
+#if defined(__ANDROID__)
+    // check if its the texture we want and intercept it
+    // we need to force SAMPLER_EXTERNAL from this point on for that one image
+    AHardwareBuffer_Desc desc = {};
+    desc.width = 1024; // Set width
+    desc.height = 1024; // Set height
+    desc.layers = 1;
+    desc.format = AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM;
+    desc.usage = AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE |
+             AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT |
+             AHARDWAREBUFFER_USAGE_GPU_FRAMEBUFFER;
 
-    if (UTILS_LIKELY(!isImported)) {
+    AHardwareBuffer* buffer = nullptr;
+    int result = AHardwareBuffer_allocate(&desc, &buffer);
+
+    if (result == 0 && buffer) {
+        mExternalBuffer = static_cast<AHardwareBuffer*>(buffer); // Mock external buffer assignment
+    } else {
+      slog.e << "mExternalBufferTexture Failed to allocate AHardwareBuffer, error code: " << result << io::endl;
+    }
+#endif //__ANDROID__
+    if(mWidth != 1024 && mHeight!= 1024 && mFormat!= filament::backend::TextureFormat::RGBA8) {
+      slog.i << "mExternalBufferTextureCPPInstantiate setExtBuffer width: " << mWidth << " height " << mHeight << " format " << mFormat << io::endl;
+      mExternalBuffer = nullptr;
+    }
+    if (mExternalBuffer != nullptr) {
+      slog.i << "mExternalBufferTextureCPPInstantiate" << io::endl;
+      mHandle = driver.createTexture(
+          SamplerType::SAMPLER_EXTERNAL, 1, InternalFormat::RGBA8, 1, 1024, 1024, 1, Usage::DEFAULT);
+      driver.setExternalImage(mHandle, mExternalBuffer);
+    } else {
+      if(UTILS_LIKELY(!isImported)) {
         mHandle = driver.createTexture(
                 mTarget, mLevelCount, mFormat, mSampleCount, mWidth, mHeight, mDepth, mUsage);
-    } else {
+      } else {
         mHandle = driver.importTexture(builder->mImportedId,
                 mTarget, mLevelCount, mFormat, mSampleCount, mWidth, mHeight, mDepth, mUsage);
+      }
     }
 
     if (UTILS_UNLIKELY(builder->mTextureIsSwizzled)) {
@@ -297,6 +334,13 @@ void FTexture::setImage(FEngine& engine, size_t level,
         uint32_t xoffset, uint32_t yoffset, uint32_t zoffset,
         uint32_t width, uint32_t height, uint32_t depth,
         FTexture::PixelBufferDescriptor&& p) const {
+
+    // remove this
+    if (mTarget == SamplerType::SAMPLER_EXTERNAL) {
+      // Log or handle this case
+      slog.e << "mExternalBuffer Texture SamplerType::SAMPLER_EXTERNAL not supported for this operation." << io::endl;
+      return; // Exit early
+    }
 
     if (UTILS_UNLIKELY(!engine.hasFeatureLevel(FeatureLevel::FEATURE_LEVEL_1))) {
         FILAMENT_CHECK_PRECONDITION(p.stride == 0 || p.stride == width)
