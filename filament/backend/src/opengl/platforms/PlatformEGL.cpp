@@ -708,6 +708,10 @@ OpenGLPlatform::ExternalTexture* PlatformEGL::createExternalImageTexture() noexc
     return outTexture;
 }
 
+OpenGLPlatform::ExternalTexture* PlatformEGL::createExternalImage(void* hardware_buffer) noexcept {
+  return nullptr;
+}
+
 void PlatformEGL::destroyExternalImage(ExternalTexture* texture) noexcept {
     glDeleteTextures(1, &texture->id);
     delete texture;

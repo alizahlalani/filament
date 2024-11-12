@@ -1031,10 +1031,23 @@ void OpenGLDriver::createTextureViewSwizzleR(Handle<HwTexture> th, Handle<HwText
     CHECK_GL_ERROR(utils::slog.e)
 }
 
+// we are calling this function
+// don't worry about width / height / format / usage (set default)
 void OpenGLDriver::createTextureExternalImageR(Handle<HwTexture> th, backend::TextureFormat format,
         uint32_t width, uint32_t height, backend::TextureUsage usage, void* image) {
-    createTextureR(th, SamplerType::SAMPLER_EXTERNAL, 1, format, 1, width, height, 1, usage);
-    setExternalImage(th, image);
+    // this will be replace by new functions solely based on void* image
+    // mPlatform.newFunction(that takes in void*) // only requirement is no specific AHB in gl driver
+//    createTextureR(th, SamplerType::SAMPLER_EXTERNAL, 1, format, 1, width, height, 1, usage);
+//    setExternalImage(th, image);
+    OpenGLPlatform::ExtendedExternalTexture* externalTexture =
+        static_cast<OpenGLPlatform::ExtendedExternalTexture*>(mPlatform.createExternalImage(image));
+    GLTexture* t = construct<GLTexture>(th, SamplerType::SAMPLER_EXTERNAL, 1, 1, externalTexture->width, externalTexture->height, 1, externalTexture->format, externalTexture->usage);
+    t->externalTexture = externalTexture;
+    t->gl.target = t->externalTexture->target;
+    t->gl.id = t->externalTexture->id;
+    t->gl.internalFormat = getInternalFormat(format);
+    t->gl.baseLevel = 0;
+    t->gl.maxLevel = 0;
 }
 
 void OpenGLDriver::createTextureExternalImagePlaneR(Handle<HwTexture> th,

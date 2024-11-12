@@ -57,6 +57,13 @@ public:
         unsigned int id;                // GLuint id
     };
 
+    struct ExtendedExternalTexture : public ExternalTexture {
+      unsigned int width;   // Texture width
+      unsigned int height;  // Texture height
+      TextureFormat format; // Texture format
+      TextureUsage usage;   // Texture usage flags
+    };
+
     /**
      * Called by the driver to destroy the OpenGL context. This should clean up any windows
      * or buffers from initialization. This is for instance where `eglDestroyContext` would be
@@ -319,6 +326,8 @@ public:
      *         values can be delayed until setExternalImage.
      */
     virtual ExternalTexture* UTILS_NULLABLE createExternalImageTexture() noexcept;
+
+    virtual ExternalTexture* UTILS_NULLABLE createExternalImage(void* _Nullable hardware_buffer) noexcept;
 
     /**
      * Destroys an external texture handle and associated data.

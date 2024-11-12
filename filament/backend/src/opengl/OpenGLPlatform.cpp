@@ -121,6 +121,10 @@ OpenGLPlatform::ExternalTexture* OpenGLPlatform::createExternalImageTexture() no
     return nullptr;
 }
 
+OpenGLPlatform::ExternalTexture* OpenGLPlatform::createExternalImage(void* hardware_buffer) noexcept {
+  return nullptr;
+}
+
 void OpenGLPlatform::destroyExternalImage(
         UTILS_UNUSED ExternalTexture* texture) noexcept {
 }

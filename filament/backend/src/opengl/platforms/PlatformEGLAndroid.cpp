@@ -232,40 +232,118 @@ Driver* PlatformEGLAndroid::createDriver(void* sharedContext,
     return driver;
 }
 
-bool PlatformEGLAndroid::setExternalImage(void* hardware_buffer, ExternalTexture* texture) noexcept {
-  slog.i << "mExternalBufferPlatformEGLAndroid" << io::endl;
+TextureFormat PlatformEGLAndroid::mapToFilamentFormat(unsigned int format) noexcept {
+  switch (format) {
+    case AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM:
+      return TextureFormat::RGBA8;
+    case AHARDWAREBUFFER_FORMAT_R8G8B8X8_UNORM:
+      return TextureFormat::RGBA8;
+    case AHARDWAREBUFFER_FORMAT_R8G8B8_UNORM:
+      return TextureFormat::RGB8;
+    case AHARDWAREBUFFER_FORMAT_R5G6B5_UNORM:
+      return TextureFormat::RGB565;
+    case AHARDWAREBUFFER_FORMAT_R16G16B16A16_FLOAT:
+      return TextureFormat::RGBA16F;
+    case AHARDWAREBUFFER_FORMAT_R10G10B10A2_UNORM:
+      return TextureFormat::RGB10_A2;
+    case AHARDWAREBUFFER_FORMAT_D16_UNORM:
+      return TextureFormat::DEPTH24;
+    case AHARDWAREBUFFER_FORMAT_D24_UNORM:
+      return TextureFormat::DEPTH24;
+    case AHARDWAREBUFFER_FORMAT_D24_UNORM_S8_UINT:
+      return TextureFormat::DEPTH24_STENCIL8;
+    case AHARDWAREBUFFER_FORMAT_D32_FLOAT:
+      return TextureFormat::DEPTH32F;
+    case AHARDWAREBUFFER_FORMAT_D32_FLOAT_S8_UINT:
+      return TextureFormat::DEPTH32F_STENCIL8;
+    case AHARDWAREBUFFER_FORMAT_S8_UINT:
+      return TextureFormat::STENCIL8;
+    case AHARDWAREBUFFER_FORMAT_YCbCr_P010:
+      return TextureFormat::RGBA8;
+    default:
+      return TextureFormat::RGBA8;
+  }
+}
 
-  AHardwareBuffer* hardwareBuffer = static_cast<AHardwareBuffer*>(hardware_buffer);
-  AHardwareBuffer_Desc hardware_buffer_description = {};
-  AHardwareBuffer_describe(hardwareBuffer, &hardware_buffer_description);
-  // If the texture is in YUV, we will sample it as an external image and let
-  // GL_TEXTURE_EXTERNAL_OES help us convert it into RGB.
-  // we may get YUV pixel format that's undocumented in Android
-  // (e.g. YCbCr_420_SP_VENUS_UBWC from https://jbit.net/Android_Colors/), so we
-  // are currently assuming every non-RGB texture is in YUV. This is not 100%
-  // safe as the pixel format can be neither RGB nor YUV.
-  slog.i << "mExternalBufferPlatformEGLAndroid hb format " << hardware_buffer_description.format << io::endl;
-  bool isExternalFormat = true;
-  switch (hardware_buffer_description.format) {
+bool PlatformEGLAndroid::isDepthFormat(unsigned int format) noexcept {
+  switch (format) {
+    case AHARDWAREBUFFER_FORMAT_D16_UNORM:
+    case AHARDWAREBUFFER_FORMAT_D24_UNORM:
+    case AHARDWAREBUFFER_FORMAT_D24_UNORM_S8_UINT:
+    case AHARDWAREBUFFER_FORMAT_D32_FLOAT:
+    case AHARDWAREBUFFER_FORMAT_D32_FLOAT_S8_UINT:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool PlatformEGLAndroid::isStencilFormat(unsigned int format) noexcept {
+  switch (format) {
+    case AHARDWAREBUFFER_FORMAT_D24_UNORM_S8_UINT:
+    case AHARDWAREBUFFER_FORMAT_D32_FLOAT_S8_UINT:
+    case AHARDWAREBUFFER_FORMAT_S8_UINT:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool PlatformEGLAndroid::isColorFormat(unsigned int format) noexcept {
+  switch (format) {
     case AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM:
     case AHARDWAREBUFFER_FORMAT_R8G8B8X8_UNORM:
     case AHARDWAREBUFFER_FORMAT_R8G8B8_UNORM:
     case AHARDWAREBUFFER_FORMAT_R5G6B5_UNORM:
     case AHARDWAREBUFFER_FORMAT_R16G16B16A16_FLOAT:
     case AHARDWAREBUFFER_FORMAT_R10G10B10A2_UNORM:
-    case AHARDWAREBUFFER_FORMAT_D16_UNORM:
-    case AHARDWAREBUFFER_FORMAT_D24_UNORM:
-    case AHARDWAREBUFFER_FORMAT_D24_UNORM_S8_UINT:
-    case AHARDWAREBUFFER_FORMAT_D32_FLOAT:
-    case AHARDWAREBUFFER_FORMAT_D32_FLOAT_S8_UINT:
-    case AHARDWAREBUFFER_FORMAT_S8_UINT:
-      isExternalFormat = false;
-      break;
+      return true;
+    default:
+      return false;
   }
-  // for testing purposes
-//  isExternalFormat = true;
-  // Log the determined target type
-  slog.i << "mExternalBufferPlatformEGLAndroid Texture target is " << (isExternalFormat ? "GL_TEXTURE_EXTERNAL_OES" : "GL_TEXTURE_2D") << io::endl;
+}
+
+TextureUsage PlatformEGLAndroid::mapToFilamentUsage(unsigned int usage, unsigned int format) noexcept {
+  TextureUsage usageFlags = TextureUsage::DEFAULT;// Default usage
+  if (usage & AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE) {
+    usageFlags |= TextureUsage::SAMPLEABLE;
+  }
+
+  if (usage & AHARDWAREBUFFER_USAGE_GPU_FRAMEBUFFER) {
+    if (isDepthFormat(format)) {
+      usageFlags |= TextureUsage::DEPTH_ATTACHMENT;
+    }
+    if (isStencilFormat(format)) {
+      usageFlags |= TextureUsage::STENCIL_ATTACHMENT;
+    }
+    if (isColorFormat(format)) {
+      usageFlags |= TextureUsage::COLOR_ATTACHMENT;
+    }
+  }
+
+  if (usage & AHARDWAREBUFFER_USAGE_GPU_DATA_BUFFER) {
+    usageFlags |= TextureUsage::UPLOADABLE;
+  }
+
+  if (usage & AHARDWAREBUFFER_USAGE_PROTECTED_CONTENT) {
+    usageFlags |= TextureUsage::PROTECTED;
+  }
+
+  return usageFlags;
+}
+
+OpenGLPlatform::ExtendedExternalTexture* UTILS_NULLABLE PlatformEGLAndroid::createExternalImage(void* _Nullable hardware_buffer) noexcept {
+  slog.i << "mExternalBufferPlatformEGLAndroid" << io::endl;
+  ExtendedExternalTexture* texture = new(std::nothrow) ExtendedExternalTexture{};
+
+  AHardwareBuffer* hardwareBuffer = static_cast<AHardwareBuffer*>(hardware_buffer);
+  AHardwareBuffer_Desc hardware_buffer_description = {};
+  AHardwareBuffer_describe(hardwareBuffer, &hardware_buffer_description);
+  texture->width = hardware_buffer_description.width;
+  texture->height = hardware_buffer_description.height;
+  texture->format = mapToFilamentFormat(hardware_buffer_description.format);
+  texture->usage = mapToFilamentUsage(hardware_buffer_description.usage, hardware_buffer_description.format);
+
   // Get the EGL client buffer from AHardwareBuffer
   EGLClientBuffer clientBuffer = eglGetNativeClientBufferANDROID(hardwareBuffer);
   // Questions around attributes with isSrgbTransfer and protected content
@@ -283,71 +361,35 @@ bool PlatformEGLAndroid::setExternalImage(void* hardware_buffer, ExternalTexture
     imageAttrs[attrIndex++] = EGL_GL_COLORSPACE_SRGB;
   }
 
-  //  if (hardware_buffer_description.usage & AHARDWAREBUFFER_USAGE_PROTECTED_CONTENT) {
-  //    imageAttrs[attrIndex++] = EGL_PROTECTED_CONTENT_EXT;
-  //    imageAttrs[attrIndex++] = EGL_TRUE;
-  //  }
+  if (hardware_buffer_description.usage & AHARDWAREBUFFER_USAGE_PROTECTED_CONTENT) {
+    imageAttrs[attrIndex++] = EGL_PROTECTED_CONTENT_EXT;
+    imageAttrs[attrIndex++] = EGL_TRUE;
+  }
   // Create an EGLImage from the client buffer
   EGLImageKHR eglImage = eglCreateImageKHR(eglGetCurrentDisplay(), EGL_NO_CONTEXT, EGL_NATIVE_BUFFER_ANDROID, clientBuffer, imageAttrs);
   if (eglImage == EGL_NO_IMAGE_KHR) {
     // Handle error
     slog.e << "mExternalBufferPlatformEGLAndroid Failed to create EGL image" << io::endl;
-    return false;
   }
   // Create and bind the OpenGL texture
   glGenTextures(1, &texture->id);
   glActiveTexture(GL_TEXTURE0);
-  auto target = isExternalFormat ? GL_TEXTURE_EXTERNAL_OES : GL_TEXTURE_2D;
-  glBindTexture(target, texture->id);
+  glBindTexture(GL_TEXTURE_EXTERNAL_OES, texture->id);
   GLenum error = glGetError();
   if (error != GL_NO_ERROR) {
     slog.e << "mExternalBufferPlatformEGLAndroid Error after glBindTexture: " << error << io::endl;
     glDeleteTextures(1, &texture->id);
     eglDestroyImageKHR(eglGetCurrentDisplay(), eglImage);
-    return false;
   }
-//  glEGLImageTargetTexture2DOES(target, static_cast<GLeglImageOES>(eglImage));
-//  error = glGetError();
-//  if (error != GL_NO_ERROR) {
-//    slog.e << "mExternalBufferPlatformEGLAndroid Error after glEGLImageTargetTexture2DOES: " << error << io::endl;
-//  }
-  texture->target = target;
+  texture->target = GL_TEXTURE_EXTERNAL_OES;
   slog.i << "mExternalBufferPlatformEGLAndroid Successfully created external image texture with ID: " << texture->id << io::endl;
-  if (!isExternalFormat) {
-    // Set up mipmap generation for GL_TEXTURE_2D only
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, hardware_buffer_description.width, hardware_buffer_description.height,
-0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-//    glGenerateMipmap(GL_TEXTURE_2D);
-    error = glGetError();
-    if (error != GL_NO_ERROR) {
-      slog.e << "mExternalBufferPlatformEGLAndroid Error after mipmap generation: " << error << io::endl;
-    }
-  } else {
-    // If it is an external texture, bind the EGL image to it
-    glEGLImageTargetTexture2DOES(target, static_cast<GLeglImageOES>(eglImage));
-    error = glGetError();
-    if (error != GL_NO_ERROR) {
-      slog.e << "Error after glEGLImageTargetTexture2DOES: " << error << io::endl;
-    }
+  glEGLImageTargetTexture2DOES(GL_TEXTURE_EXTERNAL_OES, static_cast<GLeglImageOES>(eglImage));
+  error = glGetError();
+  if (error != GL_NO_ERROR) {
+    slog.e << "Error after glEGLImageTargetTexture2DOES: " << error << io::endl;
   }
-
-//  if (!isExternalFormat) {
-//    // Set up mipmap generation for GL_TEXTURE_2D only
-//    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-//    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-//    glGenerateMipmap(GL_TEXTURE_2D);
-//    error = glGetError();
-//    if (error != GL_NO_ERROR) {
-//      slog.e << "mExternalBufferPlatformEGLAndroid Error after mipmap generation: " << error << io::endl;
-//    }
-//  }
-//  if (isExternalFormat) {
-//    OpenGLDriver::CreateTexture()
-//  }
-  // Create and return ExternalTexture object
-  return true;
+  // Return ExternalTexture object
+  return texture;
 }
 
 void PlatformEGLAndroid::setPresentationTime(int64_t presentationTimeInNanosecond) noexcept {
