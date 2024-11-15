@@ -278,12 +278,11 @@ FTexture::FTexture(FEngine& engine, const Builder& builder) {
       slog.e << "mExternalBufferTexture Failed to allocate AHardwareBuffer, error code: " << result << io::endl;
     }
 #endif //__ANDROID__
-    if(mWidth != 1024 && mHeight != 1024 && mFormat != filament::backend::TextureFormat::RGBA8 &&
-        (mUsage & (TextureUsage::SAMPLEABLE | TextureUsage::COLOR_ATTACHMENT | TextureUsage::DEPTH_ATTACHMENT)) !=
-            (TextureUsage::SAMPLEABLE | TextureUsage::COLOR_ATTACHMENT | TextureUsage::DEPTH_ATTACHMENT)) {
-      slog.i << "mExternalBufferTextureCPPInstantiate setExtBuffer width: " << mWidth << " height " << mHeight << " format " << mFormat << io::endl;
-      mExternalBuffer = nullptr;
-    }
+//    if(mFormat != filament::backend::TextureFormat::SRGB8_A8) {
+//      slog.i << "mExternalBufferTextureCPPInstantiate setExtBuffer width: " << mWidth << " height " << mHeight << " format " << mFormat << io::endl;
+//      mExternalBuffer = nullptr;
+//    }
+    mExternalBuffer = nullptr;
     if (mExternalBuffer != nullptr) {
       slog.i << "mExternalBufferTextureCPPInstantiate" << io::endl;
         mHandle = driver.createTextureExternalImage(mFormat, mWidth, mHeight, mUsage, mExternalBuffer);

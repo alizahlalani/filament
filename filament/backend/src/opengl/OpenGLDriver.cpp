@@ -1040,12 +1040,12 @@ void OpenGLDriver::createTextureExternalImageR(Handle<HwTexture> th, backend::Te
 //    createTextureR(th, SamplerType::SAMPLER_EXTERNAL, 1, format, 1, width, height, 1, usage);
 //    setExternalImage(th, image);
     OpenGLPlatform::ExtendedExternalTexture* externalTexture =
-        static_cast<OpenGLPlatform::ExtendedExternalTexture*>(mPlatform.createExternalImage(image));
+        static_cast<OpenGLPlatform::ExtendedExternalTexture*>(mPlatform.createExternalImage(image, true));
     GLTexture* t = construct<GLTexture>(th, SamplerType::SAMPLER_EXTERNAL, 1, 1, externalTexture->width, externalTexture->height, 1, externalTexture->format, externalTexture->usage);
     t->externalTexture = externalTexture;
     t->gl.target = t->externalTexture->target;
     t->gl.id = t->externalTexture->id;
-    t->gl.internalFormat = getInternalFormat(format);
+    t->gl.internalFormat = getInternalFormat(externalTexture->format);
     t->gl.baseLevel = 0;
     t->gl.maxLevel = 0;
 }

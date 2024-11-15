@@ -332,7 +332,7 @@ TextureUsage PlatformEGLAndroid::mapToFilamentUsage(unsigned int usage, unsigned
   return usageFlags;
 }
 
-OpenGLPlatform::ExtendedExternalTexture* UTILS_NULLABLE PlatformEGLAndroid::createExternalImage(void* _Nullable hardware_buffer) noexcept {
+OpenGLPlatform::ExtendedExternalTexture* UTILS_NULLABLE PlatformEGLAndroid::createExternalImage(void* _Nullable hardware_buffer, bool isSrgbTransfer) noexcept {
   slog.i << "mExternalBufferPlatformEGLAndroid" << io::endl;
   ExtendedExternalTexture* texture = new(std::nothrow) ExtendedExternalTexture{};
 
@@ -343,6 +343,8 @@ OpenGLPlatform::ExtendedExternalTexture* UTILS_NULLABLE PlatformEGLAndroid::crea
   texture->height = hardware_buffer_description.height;
   texture->format = mapToFilamentFormat(hardware_buffer_description.format);
   texture->usage = mapToFilamentUsage(hardware_buffer_description.usage, hardware_buffer_description.format);
+//  texture->format = TextureFormat::SRGB8_A8;
+//  texture->usage = TextureUsage::SAMPLEABLE | TextureUsage::COLOR_ATTACHMENT | TextureUsage::DEPTH_ATTACHMENT;
 
   // Get the EGL client buffer from AHardwareBuffer
   EGLClientBuffer clientBuffer = eglGetNativeClientBufferANDROID(hardwareBuffer);
@@ -355,7 +357,6 @@ OpenGLPlatform::ExtendedExternalTexture* UTILS_NULLABLE PlatformEGLAndroid::crea
                          EGL_NONE,
                          EGL_NONE};
   int attrIndex = 2;
-  bool isSrgbTransfer = false;
   if (isSrgbTransfer) {
     imageAttrs[attrIndex++] = EGL_GL_COLORSPACE;
     imageAttrs[attrIndex++] = EGL_GL_COLORSPACE_SRGB;

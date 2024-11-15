@@ -121,7 +121,7 @@ OpenGLPlatform::ExternalTexture* OpenGLPlatform::createExternalImageTexture() no
     return nullptr;
 }
 
-OpenGLPlatform::ExternalTexture* OpenGLPlatform::createExternalImage(void* hardware_buffer) noexcept {
+OpenGLPlatform::ExternalTexture* OpenGLPlatform::createExternalImage(void* hardware_buffer, bool isSrgbTransfer) noexcept {
   return nullptr;
 }
 

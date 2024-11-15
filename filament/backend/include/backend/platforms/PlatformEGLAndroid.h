@@ -62,7 +62,7 @@ protected:
     bool isColorFormat(unsigned int hardwareBufferFormat) noexcept;
     TextureFormat mapToFilamentFormat(unsigned int hardwareBufferFormat) noexcept;
     TextureUsage mapToFilamentUsage(unsigned int hardwareBufferUsage, unsigned int hardwareBufferFormat) noexcept;
-    OpenGLPlatform::ExtendedExternalTexture* createExternalImage(void* hardware_buffer) noexcept override;
+    OpenGLPlatform::ExtendedExternalTexture* createExternalImage(void* hardware_buffer, bool isSrgbTransfer) noexcept override;
 
     // --------------------------------------------------------------------------------------------
     // OpenGLPlatform Interface

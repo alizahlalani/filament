@@ -327,7 +327,7 @@ public:
      */
     virtual ExternalTexture* UTILS_NULLABLE createExternalImageTexture() noexcept;
 
-    virtual ExternalTexture* UTILS_NULLABLE createExternalImage(void* _Nullable hardware_buffer) noexcept;
+    virtual ExternalTexture* UTILS_NULLABLE createExternalImage(void* _Nullable hardware_buffer, bool isSrgbTransfer) noexcept;
 
     /**
      * Destroys an external texture handle and associated data.

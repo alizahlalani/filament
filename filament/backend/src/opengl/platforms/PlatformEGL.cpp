@@ -708,7 +708,7 @@ OpenGLPlatform::ExternalTexture* PlatformEGL::createExternalImageTexture() noexc
     return outTexture;
 }
 
-OpenGLPlatform::ExternalTexture* PlatformEGL::createExternalImage(void* hardware_buffer) noexcept {
+OpenGLPlatform::ExternalTexture* PlatformEGL::createExternalImage(void* hardware_buffer, bool isSrgbTransfer) noexcept {
   return nullptr;
 }
 
