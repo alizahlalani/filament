@@ -266,8 +266,8 @@ FTexture::FTexture(FEngine& engine, const Builder& builder) {
     desc.layers = 1;
     desc.format = AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM;
     desc.usage = AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE |
-             AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT |
-             AHARDWAREBUFFER_USAGE_GPU_FRAMEBUFFER;
+             AHARDWAREBUFFER_USAGE_GPU_FRAMEBUFFER |
+             AHARDWAREBUFFER_USAGE_PROTECTED_CONTENT;
 
     AHardwareBuffer* buffer = nullptr;
     int result = AHardwareBuffer_allocate(&desc, &buffer);
@@ -278,11 +278,11 @@ FTexture::FTexture(FEngine& engine, const Builder& builder) {
       slog.e << "mExternalBufferTexture Failed to allocate AHardwareBuffer, error code: " << result << io::endl;
     }
 #endif //__ANDROID__
-//    if(mFormat != filament::backend::TextureFormat::SRGB8_A8) {
-//      slog.i << "mExternalBufferTextureCPPInstantiate setExtBuffer width: " << mWidth << " height " << mHeight << " format " << mFormat << io::endl;
-//      mExternalBuffer = nullptr;
-//    }
-    mExternalBuffer = nullptr;
+    if(mFormat != filament::backend::TextureFormat::SRGB8_A8) {
+      slog.i << "mExternalBufferTextureCPPInstantiate setExtBuffer width: " << mWidth << " height " << mHeight << " format " << mFormat << io::endl;
+      mExternalBuffer = nullptr;
+    }
+//    mExternalBuffer = nullptr;
     if (mExternalBuffer != nullptr) {
       slog.i << "mExternalBufferTextureCPPInstantiate" << io::endl;
         mHandle = driver.createTextureExternalImage(mFormat, mWidth, mHeight, mUsage, mExternalBuffer);

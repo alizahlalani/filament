@@ -57,11 +57,8 @@ protected:
     Driver* createDriver(void* sharedContext,
             const Platform::DriverConfig& driverConfig) noexcept override;
 
-    bool isDepthFormat(unsigned int hardwareBufferFormat) noexcept;
-    bool isStencilFormat(unsigned int hardwareBufferFormat) noexcept;
-    bool isColorFormat(unsigned int hardwareBufferFormat) noexcept;
-    TextureFormat mapToFilamentFormat(unsigned int hardwareBufferFormat) noexcept;
-    TextureUsage mapToFilamentUsage(unsigned int hardwareBufferUsage, unsigned int hardwareBufferFormat) noexcept;
+    TextureFormat mapToFilamentFormat(unsigned int hardwareBufferFormat, bool isSrgbTransfer) noexcept;
+    TextureUsage mapToFilamentUsage(unsigned int hardwareBufferUsage, TextureFormat format) noexcept;
     OpenGLPlatform::ExtendedExternalTexture* createExternalImage(void* hardware_buffer, bool isSrgbTransfer) noexcept override;
 
     // --------------------------------------------------------------------------------------------

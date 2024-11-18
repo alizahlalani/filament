@@ -15,6 +15,7 @@
  */
 
 #include <backend/AcquiredImage.h>
+#include <backend/DriverEnums.h>
 #include <backend/Platform.h>
 #include <backend/platforms/OpenGLPlatform.h>
 #include <backend/platforms/PlatformEGL.h>
@@ -232,11 +233,19 @@ Driver* PlatformEGLAndroid::createDriver(void* sharedContext,
     return driver;
 }
 
-TextureFormat PlatformEGLAndroid::mapToFilamentFormat(unsigned int format) noexcept {
+TextureFormat PlatformEGLAndroid::mapToFilamentFormat(unsigned int format, bool isSrgbTransfer) noexcept {
+  if (isSrgbTransfer) {
+    switch (format) {
+      case AHARDWAREBUFFER_FORMAT_R8G8B8_UNORM:
+        return TextureFormat::SRGB8;
+      default:
+        return TextureFormat::SRGB8_A8;;
+    }
+  }
   switch (format) {
     case AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM:
-      return TextureFormat::RGBA8;
     case AHARDWAREBUFFER_FORMAT_R8G8B8X8_UNORM:
+    case AHARDWAREBUFFER_FORMAT_YCbCr_P010:
       return TextureFormat::RGBA8;
     case AHARDWAREBUFFER_FORMAT_R8G8B8_UNORM:
       return TextureFormat::RGB8;
@@ -247,7 +256,7 @@ TextureFormat PlatformEGLAndroid::mapToFilamentFormat(unsigned int format) noexc
     case AHARDWAREBUFFER_FORMAT_R10G10B10A2_UNORM:
       return TextureFormat::RGB10_A2;
     case AHARDWAREBUFFER_FORMAT_D16_UNORM:
-      return TextureFormat::DEPTH24;
+      return TextureFormat::DEPTH16;
     case AHARDWAREBUFFER_FORMAT_D24_UNORM:
       return TextureFormat::DEPTH24;
     case AHARDWAREBUFFER_FORMAT_D24_UNORM_S8_UINT:
@@ -258,53 +267,20 @@ TextureFormat PlatformEGLAndroid::mapToFilamentFormat(unsigned int format) noexc
       return TextureFormat::DEPTH32F_STENCIL8;
     case AHARDWAREBUFFER_FORMAT_S8_UINT:
       return TextureFormat::STENCIL8;
-    case AHARDWAREBUFFER_FORMAT_YCbCr_P010:
-      return TextureFormat::RGBA8;
+    case AHARDWAREBUFFER_FORMAT_R8_UNORM:
+      return TextureFormat::R8;
+    case AHARDWAREBUFFER_FORMAT_R16_UINT:
+      return TextureFormat::R16UI;
+    case AHARDWAREBUFFER_FORMAT_R16G16_UINT:
+      return TextureFormat::RG16UI;
     default:
-      return TextureFormat::RGBA8;
+      return TextureFormat::UNUSED;
   }
 }
 
-bool PlatformEGLAndroid::isDepthFormat(unsigned int format) noexcept {
-  switch (format) {
-    case AHARDWAREBUFFER_FORMAT_D16_UNORM:
-    case AHARDWAREBUFFER_FORMAT_D24_UNORM:
-    case AHARDWAREBUFFER_FORMAT_D24_UNORM_S8_UINT:
-    case AHARDWAREBUFFER_FORMAT_D32_FLOAT:
-    case AHARDWAREBUFFER_FORMAT_D32_FLOAT_S8_UINT:
-      return true;
-    default:
-      return false;
-  }
-}
+TextureUsage PlatformEGLAndroid::mapToFilamentUsage(unsigned int usage, TextureFormat format) noexcept {
+  TextureUsage usageFlags = TextureUsage::NONE;
 
-bool PlatformEGLAndroid::isStencilFormat(unsigned int format) noexcept {
-  switch (format) {
-    case AHARDWAREBUFFER_FORMAT_D24_UNORM_S8_UINT:
-    case AHARDWAREBUFFER_FORMAT_D32_FLOAT_S8_UINT:
-    case AHARDWAREBUFFER_FORMAT_S8_UINT:
-      return true;
-    default:
-      return false;
-  }
-}
-
-bool PlatformEGLAndroid::isColorFormat(unsigned int format) noexcept {
-  switch (format) {
-    case AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM:
-    case AHARDWAREBUFFER_FORMAT_R8G8B8X8_UNORM:
-    case AHARDWAREBUFFER_FORMAT_R8G8B8_UNORM:
-    case AHARDWAREBUFFER_FORMAT_R5G6B5_UNORM:
-    case AHARDWAREBUFFER_FORMAT_R16G16B16A16_FLOAT:
-    case AHARDWAREBUFFER_FORMAT_R10G10B10A2_UNORM:
-      return true;
-    default:
-      return false;
-  }
-}
-
-TextureUsage PlatformEGLAndroid::mapToFilamentUsage(unsigned int usage, unsigned int format) noexcept {
-  TextureUsage usageFlags = TextureUsage::DEFAULT;// Default usage
   if (usage & AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE) {
     usageFlags |= TextureUsage::SAMPLEABLE;
   }
@@ -341,8 +317,9 @@ OpenGLPlatform::ExtendedExternalTexture* UTILS_NULLABLE PlatformEGLAndroid::crea
   AHardwareBuffer_describe(hardwareBuffer, &hardware_buffer_description);
   texture->width = hardware_buffer_description.width;
   texture->height = hardware_buffer_description.height;
-  texture->format = mapToFilamentFormat(hardware_buffer_description.format);
-  texture->usage = mapToFilamentUsage(hardware_buffer_description.usage, hardware_buffer_description.format);
+  TextureFormat textureFormat = mapToFilamentFormat(hardware_buffer_description.format, isSrgbTransfer);
+  texture->format = textureFormat;
+  texture->usage = mapToFilamentUsage(hardware_buffer_description.usage, textureFormat);
 //  texture->format = TextureFormat::SRGB8_A8;
 //  texture->usage = TextureUsage::SAMPLEABLE | TextureUsage::COLOR_ATTACHMENT | TextureUsage::DEPTH_ATTACHMENT;
 

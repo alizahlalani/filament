@@ -1042,6 +1042,7 @@ void OpenGLDriver::createTextureExternalImageR(Handle<HwTexture> th, backend::Te
     OpenGLPlatform::ExtendedExternalTexture* externalTexture =
         static_cast<OpenGLPlatform::ExtendedExternalTexture*>(mPlatform.createExternalImage(image, true));
     GLTexture* t = construct<GLTexture>(th, SamplerType::SAMPLER_EXTERNAL, 1, 1, externalTexture->width, externalTexture->height, 1, externalTexture->format, externalTexture->usage);
+    slog.i << "alizah3 width: " << externalTexture->width << " height " << externalTexture->height << " format " << externalTexture->format << " uasge " << static_cast<int>(externalTexture->usage) << " usageOG " << static_cast<int>(usage) << io::endl;
     t->externalTexture = externalTexture;
     t->gl.target = t->externalTexture->target;
     t->gl.id = t->externalTexture->id;

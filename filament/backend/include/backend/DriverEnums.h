@@ -833,6 +833,21 @@ static constexpr bool isStencilFormat(TextureFormat format) noexcept {
     }
 }
 
+static constexpr bool isColorFormat(TextureFormat format) noexcept {
+  switch (format) {
+    case TextureFormat::RGBA8:
+    case TextureFormat::SRGB8:
+    case TextureFormat::SRGB8_A8:
+    case TextureFormat::RGB8:
+    case TextureFormat::RGB565:
+    case TextureFormat::RGBA16F:
+    case TextureFormat::RGB10_A2:
+      return true;
+  default:
+    return false;
+  }
+}
+
 static constexpr bool isUnsignedIntFormat(TextureFormat format) {
     switch (format) {
         case TextureFormat::R8UI:
